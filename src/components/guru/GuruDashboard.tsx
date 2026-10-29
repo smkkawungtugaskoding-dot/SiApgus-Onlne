@@ -8,8 +8,14 @@ import {
   Sparkles,
   Award,
   CheckCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CheckSquare,
+  Printer,
+  FileText,
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
+import { findWaliAssignment } from '../../utils/waliKelas';
 
 interface GuruDashboardProps {
   currentUser: UserAccount;
@@ -26,12 +32,8 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({
 }) => {
   const { siswa, guru, kelasList, guruMapel, waliKelas, profile } = db;
 
-  // Determine if this guru is a wali kelas
-  const currentWaliAssignment = waliKelas.find(
-    (wk) =>
-      wk.namaGuru.toLowerCase().trim() ===
-      currentUser.fullName.toLowerCase().trim()
-  );
+  // Robustly determine if this guru is a designated wali kelas
+  const currentWaliAssignment = findWaliAssignment(currentUser, waliKelas);
 
   // Teaching classes assigned to this guru
   const myAssignedClasses = guruMapel.filter(
@@ -56,7 +58,7 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({
               Hi, {currentUser.fullName}
             </h1>
             <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl leading-relaxed">
-              Selamat bertugas di {profile.namaSekolah}. Melalui portal SiApgus, Bapak/Ibu Guru dapat mengelola Jurnal Pembelajaran harian, input penilaian sumatif dan asesmen akhir semester (STS/SAS), serta mencetak rapor dan absensi siswa bagi Wali Kelas.
+              Selamat bertugas di {profile.namaSekolah}. Melalui portal SiApgus, Bapak/Ibu Guru dapat mengelola Jurnal Pembelajaran harian, input penilaian sumatif dan asesmen akhir semester (STS/SAS), serta mencatat absensi dan mencetak buku rapor siswa.
             </p>
           </div>
 
@@ -70,7 +72,7 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({
             </div>
             <div className="mt-1 text-xs text-emerald-100">
               {currentWaliAssignment ? (
-                <span className="inline-flex items-center gap-1 font-semibold text-amber-300">
+                <span className="inline-flex items-center gap-1 font-bold text-amber-300">
                   <Award className="w-3.5 h-3.5" />
                   Wali Kelas {currentWaliAssignment.kodeKelas}{currentWaliAssignment.rombel}
                 </span>
@@ -79,6 +81,58 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Special Wali Kelas Notice & Quick Action Banner */}
+      <div className="p-4 sm:p-5 bg-linear-to-r from-amber-500/10 via-emerald-500/10 to-blue-500/10 border border-emerald-200 rounded-2xl shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
+            <Award className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold text-slate-900">
+                {currentWaliAssignment
+                  ? `Layanan Aktif Wali Kelas ${currentWaliAssignment.kodeKelas} (${currentWaliAssignment.rombel})`
+                  : 'Layanan Wali Kelas & Cetak Rapor'}
+              </h3>
+              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
+                {currentWaliAssignment ? 'Tugas Tambahan Terdaftar' : 'Akses Terbuka'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Kelola pencatatan kehadiran harian, cetak lembar rekapitulasi absensi bulanan, dan cetak laporan hasil belajar (buku rapor siswa PDF).
+            </p>
+          </div>
+        </div>
+
+        {/* Direct Action Buttons for Wali Kelas */}
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <button
+            type="button"
+            onClick={() => onNavigate('guru-absensi')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+          >
+            <CheckSquare className="w-3.5 h-3.5" />
+            <span>Menu Absensi</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('guru-cetak-absen')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Cetak Absen</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('guru-cetak-rapor')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Cetak Rapor</span>
+          </button>
         </div>
       </div>
 
@@ -144,23 +198,94 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({
             <div className="text-lg font-bold text-slate-900 truncate">
               {currentWaliAssignment
                 ? `Wali Kelas ${currentWaliAssignment.kodeKelas}${currentWaliAssignment.rombel}`
-                : 'Guru Mata Pelajaran'}
+                : 'Wali Kelas / Guru Pengajar'}
             </div>
             <p className="text-xs text-amber-700/80 mt-1">
-              {currentWaliAssignment
-                ? 'Hak Akses Absensi & Rapor Aktif'
-                : 'Fokus Penilaian & Jurnal'}
+              Hak Akses Absensi & Cetak Rapor Aktif
             </p>
           </div>
         </div>
       </div>
 
-      {/* Quick Navigation Cards */}
+      {/* Layanan Utama Wali Kelas (Absen, Cetak Absen, Cetak Rapor) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              Layanan Khusus Wali Kelas: Absensi & Cetak Rapor
+            </h2>
+            <p className="text-xs text-slate-500">
+              Pilihan menu utama untuk pengelolaan presensi dan pencetakan dokumen siswa.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card: Menu Absensi Siswa */}
+          <div
+            onClick={() => onNavigate('guru-absensi')}
+            className="p-4 bg-slate-50 hover:bg-emerald-50/70 border border-slate-200 hover:border-emerald-300 rounded-xl cursor-pointer transition space-y-2 group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
+                  <CheckSquare className="w-4 h-4" />
+                </div>
+                <span>Menu Absensi Siswa Harian</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition" />
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Catat kehadiran harian siswa (Hadir, Sakit, Ijin, Alpha) dengan fitur indikator peringatan visual otomatis untuk kehadiran di bawah 75%.
+            </p>
+          </div>
+
+          {/* Card: Cetak Absen Siswa */}
+          <div
+            onClick={() => onNavigate('guru-cetak-absen')}
+            className="p-4 bg-slate-50 hover:bg-purple-50/70 border border-slate-200 hover:border-purple-300 rounded-xl cursor-pointer transition space-y-2 group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-purple-700 font-bold text-xs">
+                <div className="p-1.5 rounded-lg bg-purple-100 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition">
+                  <Printer className="w-4 h-4" />
+                </div>
+                <span>Cetak Rekap Absensi Siswa</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition" />
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Cetak lembar rekapitulasi presensi bulanan per kelas dalam format tabel resmi berstandar dokumen sekolah yang siap dicetak/PDF.
+            </p>
+          </div>
+
+          {/* Card: Cetak Rapor Siswa */}
+          <div
+            onClick={() => onNavigate('guru-cetak-rapor')}
+            className="p-4 bg-slate-50 hover:bg-rose-50/70 border border-slate-200 hover:border-rose-300 rounded-xl cursor-pointer transition space-y-2 group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-rose-700 font-bold text-xs">
+                <div className="p-1.5 rounded-lg bg-rose-100 text-rose-700 group-hover:bg-rose-600 group-hover:text-white transition">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <span>Cetak Rapor Siswa (PDF)</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-600 group-hover:translate-x-0.5 transition" />
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Cetak buku laporan hasil belajar peserta didik (kartu hasil belajar) format A4 resmi dengan data Kepala Sekolah dan lembar pengesahan.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Akses Cepat Menu Kerja Guru */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
         <h2 className="text-sm font-bold text-slate-900">
-          Akses Cepat Menu Kerja Guru
+          Akses Menu Pembelajaran Guru
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div
             onClick={() => onNavigate('guru-jurnal')}
             className="p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl cursor-pointer transition space-y-1.5"
@@ -186,31 +311,6 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({
               Input Sumatif 1, 2, 3, STS, SAS, dan hitung nilai akhir otomatis.
             </p>
           </div>
-
-          {currentWaliAssignment ? (
-            <div
-              onClick={() => onNavigate('guru-cetak-rapor')}
-              className="p-4 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-xl cursor-pointer transition space-y-1.5"
-            >
-              <div className="flex items-center gap-2 text-amber-700 font-semibold text-xs">
-                <Award className="w-4 h-4" />
-                <span>Cetak Rapor Siswa</span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Rekap semua nilai mapel dan cetak rapor kelas {currentWaliAssignment.kodeKelas}{currentWaliAssignment.rombel}.
-              </p>
-            </div>
-          ) : (
-            <div className="p-4 bg-slate-50/60 border border-slate-200/60 rounded-xl space-y-1.5 opacity-75">
-              <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
-                <Award className="w-4 h-4" />
-                <span>Menu Wali Kelas Khusus</span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Menu cetak rapor & absensi hanya tampil bagi guru yang ditetapkan sebagai wali kelas oleh Admin.
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

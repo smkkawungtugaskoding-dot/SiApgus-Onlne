@@ -11,8 +11,10 @@ import {
   Download,
   Database,
   AlertCircle,
+  AlertTriangle,
   X,
   Save,
+  Loader2,
   Sparkles
 } from 'lucide-react';
 
@@ -40,6 +42,7 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
   const [isSavedRecently, setIsSavedRecently] = useState(false);
   const [isAutoSaved, setIsAutoSaved] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -61,7 +64,28 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
     setWebAppUrl(sheetsWebAppUrl);
   }, [sheetsWebAppUrl]);
 
-  // Centralized field change handler with AUTOMATIC SAVING and propagation across the system
+  // Validation Rules
+  const isNamaSekolahFilled = formData.namaSekolah.trim().length > 0;
+  const isKepalaSekolahFilled = formData.kepalaSekolah.trim().length > 0;
+
+  // NPSN Validation: must be filled and strictly numeric
+  const isNpsnFilled = formData.npsn.trim().length > 0;
+  const isNpsnNumeric = /^\d+$/.test(formData.npsn.trim());
+  const isNpsnValid = isNpsnFilled && isNpsnNumeric;
+
+  // NUPTK / NIP Validation: must be filled and strictly numeric
+  const isNuptkFilled = formData.nuptk.trim().length > 0;
+  const isNuptkNumeric = /^\d+$/.test(formData.nuptk.trim());
+  const isNuptkValid = isNuptkFilled && isNuptkNumeric;
+
+  // All required fields filled & valid format
+  const isFormValid =
+    isNamaSekolahFilled &&
+    isKepalaSekolahFilled &&
+    isNpsnValid &&
+    isNuptkValid;
+
+  // Centralized field change handler with real-time validation and conditional auto-save
   const handleFieldChange = (field: keyof SchoolProfile, value: string) => {
     isLocalUpdate.current = true;
     const updated = {
@@ -70,17 +94,30 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
     };
     setFormData(updated);
 
-    // Save and propagate immediately to App state and persistent storage
-    onUpdateProfile(updated);
+    // Compute updated validity
+    const updatedNamaFilled = updated.namaSekolah.trim().length > 0;
+    const updatedKepalaFilled = updated.kepalaSekolah.trim().length > 0;
+    const updatedNpsnValid = updated.npsn.trim().length > 0 && /^\d+$/.test(updated.npsn.trim());
+    const updatedNuptkValid = updated.nuptk.trim().length > 0 && /^\d+$/.test(updated.nuptk.trim());
+    const updatedFormValid =
+      updatedNamaFilled &&
+      updatedKepalaFilled &&
+      updatedNpsnValid &&
+      updatedNuptkValid;
 
-    const timeStr = new Date().toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    setLastSavedTime(timeStr);
-    setIsAutoSaved(true);
-    setTimeout(() => setIsAutoSaved(false), 2000);
+    // Only auto-save to storage if the current state is valid
+    if (updatedFormValid) {
+      onUpdateProfile(updated);
+
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      setLastSavedTime(timeStr);
+      setIsAutoSaved(true);
+      setTimeout(() => setIsAutoSaved(false), 2000);
+    }
   };
 
   // Handle Logo Upload (JPEG, JPG, PNG) with immediate save
@@ -114,54 +151,70 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
     setTimeout(() => setStatusMessage(''), 4000);
   };
 
-  // Manual explicit save button handler with prominent confirmation toast
-  const handleSaveProfile = (e?: React.FormEvent | React.MouseEvent) => {
+  // Manual save handler with loading spinner state and validation gate
+  const handleSaveProfile = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }
 
-    // Validation
-    if (!formData.namaSekolah || !formData.namaSekolah.trim()) {
-      setErrorMessage('Nama Sekolah wajib diisi!');
+    // Validation guard: reject save if form is invalid
+    if (!isFormValid || isSaving) {
+      if (!isNamaSekolahFilled) {
+        setErrorMessage('Nama Sekolah wajib diisi!');
+      } else if (!isKepalaSekolahFilled) {
+        setErrorMessage('Nama Kepala Sekolah wajib diisi!');
+      } else if (!isNpsnFilled) {
+        setErrorMessage('NPSN wajib diisi!');
+      } else if (!isNpsnNumeric) {
+        setErrorMessage('Format NPSN tidak valid: hanya boleh berisi angka (numerik).');
+      } else if (!isNuptkFilled) {
+        setErrorMessage('NUPTK/NIP Kepala Sekolah wajib diisi!');
+      } else if (!isNuptkNumeric) {
+        setErrorMessage('Format NUPTK/NIP tidak valid: harus berupa angka (numerik).');
+      }
       setTimeout(() => setErrorMessage(''), 4000);
       return;
     }
 
-    if (!formData.kepalaSekolah || !formData.kepalaSekolah.trim()) {
-      setErrorMessage('Nama Kepala Sekolah wajib diisi!');
-      setTimeout(() => setErrorMessage(''), 4000);
-      return;
+    setIsSaving(true);
+    try {
+      // Simulate realistic persistence delay for visible loading spinner
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      // Persist clean trimmed data
+      onUpdateProfile({
+        ...formData,
+        namaSekolah: formData.namaSekolah.trim(),
+        kepalaSekolah: formData.kepalaSekolah.trim(),
+        npsn: formData.npsn.trim(),
+        nuptk: formData.nuptk.trim(),
+      });
+
+      if (onUpdateSheetsUrl) {
+        onUpdateSheetsUrl(webAppUrl.trim());
+      }
+
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      setLastSavedTime(timeStr);
+      setIsSavedRecently(true);
+      setShowToast(true);
+      setErrorMessage('');
+      setStatusMessage('Profil sekolah berhasil disimpan! Seluruh data dan nama sekolah telah diperbarui secara otomatis.');
+
+      setTimeout(() => {
+        setIsSavedRecently(false);
+      }, 3500);
+
+      setTimeout(() => {
+        setShowToast(false);
+      }, 5000);
+    } finally {
+      setIsSaving(false);
     }
-
-    // Explicit persist
-    onUpdateProfile({
-      ...formData,
-      namaSekolah: formData.namaSekolah.trim(),
-      kepalaSekolah: formData.kepalaSekolah.trim(),
-    });
-
-    if (onUpdateSheetsUrl) {
-      onUpdateSheetsUrl(webAppUrl.trim());
-    }
-
-    const timeStr = new Date().toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    setLastSavedTime(timeStr);
-    setIsSavedRecently(true);
-    setShowToast(true);
-    setErrorMessage('');
-    setStatusMessage('Profil sekolah berhasil disimpan! Seluruh data dan nama sekolah telah diperbarui secara otomatis.');
-
-    setTimeout(() => {
-      setIsSavedRecently(false);
-    }, 3500);
-
-    setTimeout(() => {
-      setShowToast(false);
-    }, 5000);
   };
 
   const handleDownloadCodeGs = () => {
@@ -221,7 +274,7 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
                 Profil Sekolah Berhasil Disimpan!
               </h4>
               <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">
-                Tersimpan Otomatis
+                Valid & Tersimpan
               </span>
             </div>
             <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
@@ -252,25 +305,32 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
             <span>Menu Setting Profil Satuan Pendidikan</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Atur identitas resmi sekolah, akreditasi, kurikulum, dan logo sekolah yang otomatis tersimpan dan berubah secara langsung.
+            Atur identitas resmi sekolah, akreditasi, kurikulum, dan logo sekolah dengan validasi numerik otomatis.
           </p>
         </div>
 
-        {/* Auto-Save Live Status Badge */}
+        {/* Auto-Save & Validation Live Status Badge */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold shadow-2xs">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          {isFormValid ? (
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>
+                {isAutoSaved
+                  ? 'Menyimpan perubahan...'
+                  : lastSavedTime
+                  ? `Tersimpan otomatis (${lastSavedTime} WIB)`
+                  : 'Auto-Save Aktif: Data valid & tersimpan'}
+              </span>
             </span>
-            <span>
-              {isAutoSaved
-                ? 'Menyimpan perubahan...'
-                : lastSavedTime
-                ? `Tersimpan otomatis (${lastSavedTime} WIB)`
-                : 'Auto-Save Aktif: Data otomatis tersimpan'}
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl text-xs font-semibold shadow-2xs">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>Menunggu format data valid (NPSN & NUPTK numerik)</span>
             </span>
-          </span>
+          )}
         </div>
       </div>
 
@@ -301,7 +361,7 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
               </h2>
             </div>
             <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-              Perubahan langsung tersimpan tanpa harus me-refresh halaman
+              Kolom bertanda <span className="text-red-500 font-bold">*</span> wajib diisi dengan format valid
             </span>
           </div>
 
@@ -363,9 +423,6 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Nama Sekolah <span className="text-red-500">*</span>
-                <span className="ml-2 text-[10px] font-normal text-emerald-600">
-                  (Otomatis berubah di sidebar, dashboard, dan login saat diketik)
-                </span>
               </label>
               <input
                 type="text"
@@ -373,8 +430,22 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
                 value={formData.namaSekolah}
                 onChange={(e) => handleFieldChange('namaSekolah', e.target.value)}
                 placeholder="Contoh: SMP NEGERI 1 NUSANTARA"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+                className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold transition focus:outline-hidden focus:ring-2 ${
+                  !isNamaSekolahFilled
+                    ? 'bg-rose-50/40 border border-rose-400 text-rose-900 focus:ring-rose-400 focus:bg-white'
+                    : 'bg-slate-50 border border-slate-300 text-slate-800 focus:ring-blue-500 focus:bg-white'
+                }`}
               />
+              {!isNamaSekolahFilled ? (
+                <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1 font-medium">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <span>Nama Sekolah wajib diisi.</span>
+                </p>
+              ) : (
+                <p className="text-[10px] text-emerald-600 mt-1">
+                  Otomatis diperbarui di sidebar, dashboard, dan login saat diketik.
+                </p>
+              )}
             </div>
 
             {/* Nama Kepala Sekolah */}
@@ -388,36 +459,116 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
                 value={formData.kepalaSekolah}
                 onChange={(e) => handleFieldChange('kepalaSekolah', e.target.value)}
                 placeholder="Contoh: Drs. H. Ahmad Fauzi, M.Pd"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+                className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold transition focus:outline-hidden focus:ring-2 ${
+                  !isKepalaSekolahFilled
+                    ? 'bg-rose-50/40 border border-rose-400 text-rose-900 focus:ring-rose-400 focus:bg-white'
+                    : 'bg-slate-50 border border-slate-300 text-slate-800 focus:ring-blue-500 focus:bg-white'
+                }`}
               />
+              {!isKepalaSekolahFilled && (
+                <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1 font-medium">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <span>Nama Kepala Sekolah wajib diisi.</span>
+                </p>
+              )}
             </div>
 
-            {/* NUPTK */}
+            {/* NPSN with Real-Time Numeric Validation */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                NUPTK / NIP Kepala Sekolah
+                NPSN (Nomor Pokok Sekolah Nasional) <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={formData.nuptk}
-                onChange={(e) => handleFieldChange('nuptk', e.target.value)}
-                placeholder="Contoh: 197508122000031002"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  inputMode="numeric"
+                  value={formData.npsn}
+                  onChange={(e) => handleFieldChange('npsn', e.target.value)}
+                  placeholder="Contoh: 20104567"
+                  className={`w-full px-3.5 py-2.5 pr-9 rounded-xl text-xs font-mono transition focus:outline-hidden focus:ring-2 ${
+                    isNpsnFilled && !isNpsnNumeric
+                      ? 'bg-rose-50/50 border border-rose-400 text-rose-900 focus:ring-rose-400 focus:bg-white'
+                      : isNpsnValid
+                      ? 'bg-emerald-50/30 border border-emerald-300 text-slate-800 focus:ring-emerald-500 focus:bg-white'
+                      : 'bg-slate-50 border border-slate-300 text-slate-800 focus:ring-blue-500 focus:bg-white'
+                  }`}
+                />
+                <div className="absolute right-3 top-2.5 pointer-events-none">
+                  {isNpsnFilled && !isNpsnNumeric ? (
+                    <AlertCircle className="w-4 h-4 text-rose-500 animate-pulse" />
+                  ) : isNpsnValid ? (
+                    <Check className="w-4 h-4 text-emerald-600" />
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Real-Time Validation Feedback for NPSN */}
+              {isNpsnFilled && !isNpsnNumeric ? (
+                <div className="flex items-center gap-1.5 text-[11px] text-rose-600 mt-1.5 font-medium bg-rose-50/70 p-1.5 rounded-lg border border-rose-200 animate-in fade-in duration-200">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <span>Format NPSN harus numerik (angka saja tanpa huruf atau simbol).</span>
+                </div>
+              ) : !isNpsnFilled ? (
+                <p className="flex items-center gap-1 text-[11px] text-amber-600 mt-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>NPSN wajib diisi (8 digit angka).</span>
+                </p>
+              ) : (
+                <p className="flex items-center gap-1 text-[11px] text-emerald-600 mt-1">
+                  <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>Format NPSN valid ({formData.npsn.trim().length} digit angka).</span>
+                </p>
+              )}
             </div>
 
-            {/* NPSN */}
+            {/* NUPTK / NIP with Real-Time Numeric Validation */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                NPSN (Nomor Pokok Sekolah Nasional)
+                NUPTK / NIP Kepala Sekolah <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={formData.npsn}
-                onChange={(e) => handleFieldChange('npsn', e.target.value)}
-                placeholder="Contoh: 20104567"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  inputMode="numeric"
+                  value={formData.nuptk}
+                  onChange={(e) => handleFieldChange('nuptk', e.target.value)}
+                  placeholder="Contoh: 197508122000031002"
+                  className={`w-full px-3.5 py-2.5 pr-9 rounded-xl text-xs font-mono transition focus:outline-hidden focus:ring-2 ${
+                    isNuptkFilled && !isNuptkNumeric
+                      ? 'bg-rose-50/50 border border-rose-400 text-rose-900 focus:ring-rose-400 focus:bg-white'
+                      : isNuptkValid
+                      ? 'bg-emerald-50/30 border border-emerald-300 text-slate-800 focus:ring-emerald-500 focus:bg-white'
+                      : 'bg-slate-50 border border-slate-300 text-slate-800 focus:ring-blue-500 focus:bg-white'
+                  }`}
+                />
+                <div className="absolute right-3 top-2.5 pointer-events-none">
+                  {isNuptkFilled && !isNuptkNumeric ? (
+                    <AlertCircle className="w-4 h-4 text-rose-500 animate-pulse" />
+                  ) : isNuptkValid ? (
+                    <Check className="w-4 h-4 text-emerald-600" />
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Real-Time Validation Feedback for NUPTK */}
+              {isNuptkFilled && !isNuptkNumeric ? (
+                <div className="flex items-center gap-1.5 text-[11px] text-rose-600 mt-1.5 font-medium bg-rose-50/70 p-1.5 rounded-lg border border-rose-200 animate-in fade-in duration-200">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <span>Format NUPTK/NIP harus numerik (angka saja tanpa spasi/huruf).</span>
+                </div>
+              ) : !isNuptkFilled ? (
+                <p className="flex items-center gap-1 text-[11px] text-amber-600 mt-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>NUPTK/NIP wajib diisi (angka).</span>
+                </p>
+              ) : (
+                <p className="flex items-center gap-1 text-[11px] text-emerald-600 mt-1">
+                  <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>Format NUPTK/NIP valid ({formData.nuptk.trim().length} digit angka).</span>
+                </p>
+              )}
             </div>
 
             {/* Akreditasi (Dropdown A, B, C) */}
@@ -498,32 +649,56 @@ export const AdminMenuSetting: React.FC<AdminMenuSettingProps> = ({
           {/* Bottom Action Area with Status indicator & Manual Save Trigger */}
           <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="font-semibold">Status Simpan:</span>
-                <span>
-                  {lastSavedTime
-                    ? `Otomatis Tersimpan (${lastSavedTime} WIB)`
-                    : 'Tersimpan Otomatis ke Database'}
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-400">
-                Data profil dan nama sekolah langsung tersimpan secara otomatis setiap kali diketik.
-              </span>
+              {isFormValid ? (
+                <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="font-semibold">Status:</span>
+                  <span>
+                    {lastSavedTime
+                      ? `Data Valid & Otomatis Tersimpan (${lastSavedTime} WIB)`
+                      : 'Semua Field Wajib Valid'}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>
+                    Tombol simpan dinonaktifkan: Lengkapi field wajib (*) dan pastikan NPSN serta NUPTK berformat angka (numerik).
+                  </span>
+                </div>
+              )}
             </div>
 
+            {/* Simpan Button with Loading Spinner & Validation Gate */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 id="btn-simpan-profil"
+                disabled={!isFormValid || isSaving}
                 onClick={handleSaveProfile}
-                className={`w-full sm:w-auto px-6 py-2.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm transition cursor-pointer active:scale-95 ${
-                  isSavedRecently
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                title={
+                  !isFormValid
+                    ? 'Lengkapi semua field wajib dan pastikan NPSN serta NUPTK hanya berisi angka untuk mengaktifkan tombol'
+                    : isSaving
+                    ? 'Sedang menyimpan data...'
+                    : 'Klik untuk menyimpan pengaturan profil'
+                }
+                className={`w-full sm:w-auto px-6 py-2.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition shadow-sm ${
+                  isSaving
+                    ? 'bg-blue-500 text-white cursor-wait opacity-90'
+                    : !isFormValid
+                    ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed shadow-none'
+                    : isSavedRecently
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300 cursor-pointer active:scale-95'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer active:scale-95'
                 }`}
               >
-                {isSavedRecently ? (
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Menyimpan Profil Sekolah...</span>
+                  </>
+                ) : isSavedRecently ? (
                   <>
                     <Check className="w-4 h-4 text-white stroke-[2.5]" />
                     <span>Profil Sekolah Tersimpan!</span>

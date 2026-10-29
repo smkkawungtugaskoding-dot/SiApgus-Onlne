@@ -14,247 +14,37 @@ import {
   WaliKelasAssignment,
   AbsensiRecord
 } from '../types';
+import {
+  DEFAULT_PROFILE,
+  INITIAL_USERS,
+  INITIAL_SISWA,
+  INITIAL_GURU,
+  INITIAL_MAPEL_LIST,
+  INITIAL_KELAS_LIST,
+  INITIAL_GURU_MAPEL,
+  INITIAL_WALI_KELAS,
+  INITIAL_JURNAL,
+  INITIAL_PENILAIAN,
+  INITIAL_ABSENSI,
+  createInitialDatabase
+} from './defaultData';
 
-const STORAGE_KEY = 'siapgus_school_db_v1';
-
-export const DEFAULT_PROFILE: SchoolProfile = {
-  namaSekolah: 'SMP NEGERI 1 KELUARGA TELADAN',
-  kepalaSekolah: 'Drs. H. Mulyadi, M.Pd.',
-  nuptk: '197503122000031002',
-  npsn: '20501892',
-  akreditasi: 'A',
-  kurikulum: 'Kurikulum Merdeka',
-  kodePos: '60234',
-  alamatSekolah: 'Jl. Pendidikan Karakter No. 12, Surabaya',
-  telp: '(031) 8439211',
-  logoUrl: '' // Empty or fallback SVG logo
+export {
+  DEFAULT_PROFILE,
+  INITIAL_USERS,
+  INITIAL_SISWA,
+  INITIAL_GURU,
+  INITIAL_MAPEL_LIST,
+  INITIAL_KELAS_LIST,
+  INITIAL_GURU_MAPEL,
+  INITIAL_WALI_KELAS,
+  INITIAL_JURNAL,
+  INITIAL_PENILAIAN,
+  INITIAL_ABSENSI,
+  createInitialDatabase
 };
 
-export const INITIAL_USERS: UserAccount[] = [
-  {
-    id: 'USR-001',
-    username: 'admin',
-    password: '123',
-    role: 'admin',
-    fullName: 'Drs. H. Mulyadi, M.Pd. (Admin)',
-    createdAt: '2026-01-10T08:00:00Z'
-  },
-  {
-    id: 'USR-002',
-    username: 'budi',
-    password: '123',
-    role: 'guru',
-    fullName: 'Budi Santoso, S.Pd.',
-    assignedTeacherId: 'GUR-001',
-    createdAt: '2026-01-12T09:00:00Z'
-  },
-  {
-    id: 'USR-003',
-    username: 'siti',
-    password: '123',
-    role: 'guru',
-    fullName: 'Siti Aminah, M.Pd.',
-    assignedTeacherId: 'GUR-002',
-    createdAt: '2026-01-12T09:30:00Z'
-  },
-  {
-    id: 'USR-004',
-    username: 'hendra',
-    password: '123',
-    role: 'guru',
-    fullName: 'Hendra Wijaya, S.Kom.',
-    assignedTeacherId: 'GUR-003',
-    createdAt: '2026-01-14T10:00:00Z'
-  }
-];
-
-export const INITIAL_SISWA: Siswa[] = [
-  { id: 'SIS-001', nama: 'Aditya Pratama Putra', jenisKelamin: 'L', kelas: '7', rombel: 'A' },
-  { id: 'SIS-002', nama: 'Anindya Kirana Putri', jenisKelamin: 'P', kelas: '7', rombel: 'A' },
-  { id: 'SIS-003', nama: 'Bagas Satria Wibowo', jenisKelamin: 'L', kelas: '7', rombel: 'A' },
-  { id: 'SIS-004', nama: 'Cantika Putri Ramadhani', jenisKelamin: 'P', kelas: '7', rombel: 'A' },
-  { id: 'SIS-005', nama: 'Dimas Arya Yudha', jenisKelamin: 'L', kelas: '7', rombel: 'A' },
-  { id: 'SIS-006', nama: 'Eka Lestari Rahayu', jenisKelamin: 'P', kelas: '7', rombel: 'A' },
-  { id: 'SIS-007', nama: 'Fajar Nugraha', jenisKelamin: 'L', kelas: '7', rombel: 'B' },
-  { id: 'SIS-008', nama: 'Gita Permata Sari', jenisKelamin: 'P', kelas: '7', rombel: 'B' },
-  { id: 'SIS-009', nama: 'Hafiz Syahputra', jenisKelamin: 'L', kelas: '7', rombel: 'B' },
-  { id: 'SIS-010', nama: 'Indah Cahyani', jenisKelamin: 'P', kelas: '8', rombel: 'A' },
-  { id: 'SIS-011', nama: 'Joko Tri Prasetyo', jenisKelamin: 'L', kelas: '8', rombel: 'A' },
-  { id: 'SIS-012', nama: 'Karin Amelia', jenisKelamin: 'P', kelas: '8', rombel: 'B' },
-  { id: 'SIS-013', nama: 'Luthfi Hakim', jenisKelamin: 'L', kelas: '9', rombel: 'A' },
-  { id: 'SIS-014', nama: 'Maya Anggraini', jenisKelamin: 'P', kelas: '9', rombel: 'A' },
-  { id: 'SIS-015', nama: 'Naufal Rizky', jenisKelamin: 'L', kelas: '9', rombel: 'C' }
-];
-
-export const INITIAL_GURU: Guru[] = [
-  { id: 'GUR-001', nama: 'Budi Santoso, S.Pd.', jenisKelamin: 'L', mapel: 'Matematika' },
-  { id: 'GUR-002', nama: 'Siti Aminah, M.Pd.', jenisKelamin: 'P', mapel: 'Bahasa Indonesia' },
-  { id: 'GUR-003', nama: 'Hendra Wijaya, S.Kom.', jenisKelamin: 'L', mapel: 'Informatika' },
-  { id: 'GUR-004', nama: 'Dewi Lestari, S.Pd.', jenisKelamin: 'P', mapel: 'Ilmu Pengetahuan Alam (IPA)' },
-  { id: 'GUR-005', nama: 'Drs. Bambang Irawan', jenisKelamin: 'L', mapel: 'Pendidikan Pancasila' },
-  { id: 'GUR-006', nama: 'Nurul Hidayati, S.Pd.', jenisKelamin: 'P', mapel: 'Bahasa Inggris' }
-];
-
-export const INITIAL_MAPEL_LIST: MataPelajaran[] = [
-  { id: 'MAP-001', kodeMapel: 'MTK-01', pelajaran: 'Matematika' },
-  { id: 'MAP-002', kodeMapel: 'BIN-01', pelajaran: 'Bahasa Indonesia' },
-  { id: 'MAP-003', kodeMapel: 'INF-01', pelajaran: 'Informatika' },
-  { id: 'MAP-004', kodeMapel: 'IPA-01', pelajaran: 'Ilmu Pengetahuan Alam (IPA)' },
-  { id: 'MAP-005', kodeMapel: 'PPKN-01', pelajaran: 'Pendidikan Pancasila' },
-  { id: 'MAP-006', kodeMapel: 'BIG-01', pelajaran: 'Bahasa Inggris' }
-];
-
-export const INITIAL_KELAS_LIST: KelasItem[] = [
-  { id: 'KLS-001', kelas: '7', rombel: 'A' },
-  { id: 'KLS-002', kelas: '7', rombel: 'B' },
-  { id: 'KLS-003', kelas: '7', rombel: 'C' },
-  { id: 'KLS-004', kelas: '7', rombel: 'D' },
-  { id: 'KLS-005', kelas: '8', rombel: 'A' },
-  { id: 'KLS-006', kelas: '8', rombel: 'B' },
-  { id: 'KLS-007', kelas: '8', rombel: 'C' },
-  { id: 'KLS-008', kelas: '8', rombel: 'D' },
-  { id: 'KLS-009', kelas: '9', rombel: 'A' },
-  { id: 'KLS-010', kelas: '9', rombel: 'B' },
-  { id: 'KLS-011', kelas: '9', rombel: 'C' },
-  { id: 'KLS-012', kelas: '9', rombel: 'D' }
-];
-
-export const INITIAL_GURU_MAPEL: GuruMapelAssignment[] = [
-  { id: 'GM-001', namaGuru: 'Budi Santoso, S.Pd.', jenisKelamin: 'L', guruMataPelajaran: 'Matematika', tugasTambahan: 'Wali Kelas 7B', kelas: '7', rombel: 'A' },
-  { id: 'GM-002', namaGuru: 'Budi Santoso, S.Pd.', jenisKelamin: 'L', guruMataPelajaran: 'Matematika', tugasTambahan: 'Wali Kelas 7B', kelas: '7', rombel: 'B' },
-  { id: 'GM-003', namaGuru: 'Siti Aminah, M.Pd.', jenisKelamin: 'P', guruMataPelajaran: 'Bahasa Indonesia', tugasTambahan: 'Wali Kelas 7A', kelas: '7', rombel: 'A' },
-  { id: 'GM-004', namaGuru: 'Hendra Wijaya, S.Kom.', jenisKelamin: 'L', guruMataPelajaran: 'Informatika', tugasTambahan: 'Pembina OSIS', kelas: '7', rombel: 'A' },
-  { id: 'GM-005', namaGuru: 'Dewi Lestari, S.Pd.', jenisKelamin: 'P', guruMataPelajaran: 'Ilmu Pengetahuan Alam (IPA)', tugasTambahan: 'Kepala Lab IPA', kelas: '7', rombel: 'A' },
-  { id: 'GM-006', namaGuru: 'Drs. Bambang Irawan', jenisKelamin: 'L', guruMataPelajaran: 'Pendidikan Pancasila', tugasTambahan: 'Koordinator P5', kelas: '7', rombel: 'A' }
-];
-
-export const INITIAL_WALI_KELAS: WaliKelasAssignment[] = [
-  { id: 'WK-001', kodeKelas: '7', rombel: 'A', namaGuru: 'Siti Aminah, M.Pd.', jenisKelamin: 'P', guruMataPelajaran: 'Bahasa Indonesia', tugasTambahan: 'Wali Kelas 7A' },
-  { id: 'WK-002', kodeKelas: '7', rombel: 'B', namaGuru: 'Budi Santoso, S.Pd.', jenisKelamin: 'L', guruMataPelajaran: 'Matematika', tugasTambahan: 'Wali Kelas 7B' },
-  { id: 'WK-003', kodeKelas: '8', rombel: 'A', namaGuru: 'Dewi Lestari, S.Pd.', jenisKelamin: 'P', guruMataPelajaran: 'Ilmu Pengetahuan Alam (IPA)', tugasTambahan: 'Wali Kelas 8A' },
-  { id: 'WK-004', kodeKelas: '9', rombel: 'A', namaGuru: 'Hendra Wijaya, S.Kom.', jenisKelamin: 'L', guruMataPelajaran: 'Informatika', tugasTambahan: 'Wali Kelas 9A' }
-];
-
-export const INITIAL_JURNAL: JurnalItem[] = [
-  {
-    id: 'JRN-001',
-    tanggal: '2026-10-27',
-    hari: 'Senin',
-    kelas: '7A',
-    jamKe: '1 - 2',
-    capaianPembelajaran: 'Peserta didik mampu memahami konsep dasar aljabar dan persamaan linier satu variabel.',
-    tujuanPembelajaran: 'Menyelesaikan permasalahan kontekstual menggunakan persamaan linier sederhana.',
-    kbm: 'Diskusi kelompok berbasis masalah (PBL) dan presentasi hasil lembar kerja.',
-    refleksi: 'Sebagian besar siswa antusias dan memahami operasi aljabar, 2 siswa perlu pendampingan.',
-    asesmen: 'Penilaian formatif rubrik diskusi kelompok dan kuis singkat.',
-    siswaTidakHadir: 'Aditya Pratama (Sakit)',
-    namaGuru: 'Budi Santoso, S.Pd.'
-  },
-  {
-    id: 'JRN-002',
-    tanggal: '2026-10-28',
-    hari: 'Selasa',
-    kelas: '7A',
-    jamKe: '3 - 4',
-    capaianPembelajaran: 'Peserta didik mampu menganalisis struktur teks deskripsi lingkungan sekolah.',
-    tujuanPembelajaran: 'Mengidentifikasi ide pokok dan kosakata serapan dalam teks deskripsi.',
-    kbm: 'Membaca terbimbing, menganalisis paragraf deskriptif, dan menulis ringkasan.',
-    refleksi: 'Siswa dapat menemukan kata kunci dengan cepat, interaksi tanya jawab sangat hidup.',
-    asesmen: 'Tugas portofolio penulisan deskripsi ruang kelas.',
-    siswaTidakHadir: 'Nihil (Hadir Semua)',
-    namaGuru: 'Siti Aminah, M.Pd.'
-  }
-];
-
-export const INITIAL_PENILAIAN: PenilaianItem[] = [
-  {
-    id: 'NIL-001',
-    siswaId: 'SIS-001',
-    namaSiswa: 'Aditya Pratama Putra',
-    kelas: '7',
-    rombel: 'A',
-    mapel: 'Matematika',
-    pengajar: 'Budi Santoso, S.Pd.',
-    tahunPelajaran: '2026/2027',
-    semester: 'Ganjil',
-    kktp: 75,
-    sumatif1: 85,
-    sumatif2: 80,
-    sumatif3: 88,
-    sts: 82,
-    sas: 86,
-    nilaiSisipan: 83,
-    capaianSisipan: 'Menunjukkan pemahaman yang sangat baik dalam memahami konsep aljabar dan relasi fungsi.',
-    nilaiAkhir: 85,
-    capaianAkhir: 'Sangat baik dalam menyelesaikan masalah kontekstual aljabar dan geometri bidang.',
-    sumatif1Saved: true,
-    sumatif2Saved: true,
-    sumatif3Saved: true,
-    stsSaved: true,
-    sasSaved: true
-  },
-  {
-    id: 'NIL-002',
-    siswaId: 'SIS-002',
-    namaSiswa: 'Anindya Kirana Putri',
-    kelas: '7',
-    rombel: 'A',
-    mapel: 'Matematika',
-    pengajar: 'Budi Santoso, S.Pd.',
-    tahunPelajaran: '2026/2027',
-    semester: 'Ganjil',
-    kktp: 75,
-    sumatif1: 90,
-    sumatif2: 92,
-    sumatif3: 94,
-    sts: 91,
-    sas: 95,
-    nilaiSisipan: 92,
-    capaianSisipan: 'Menunjukkan penguasaan sangat tinggi dalam aljabar dan penalaran logis matematika.',
-    nilaiAkhir: 93,
-    capaianAkhir: 'Istimewa dan tuntas mandiri dalam menyelesaikan persoalan matematis tingkat lanjut.',
-    sumatif1Saved: true,
-    sumatif2Saved: true,
-    sumatif3Saved: true,
-    stsSaved: true,
-    sasSaved: true
-  },
-  {
-    id: 'NIL-003',
-    siswaId: 'SIS-003',
-    namaSiswa: 'Bagas Satria Wibowo',
-    kelas: '7',
-    rombel: 'A',
-    mapel: 'Matematika',
-    pengajar: 'Budi Santoso, S.Pd.',
-    tahunPelajaran: '2026/2027',
-    semester: 'Ganjil',
-    kktp: 75,
-    sumatif1: 78,
-    sumatif2: 76,
-    sumatif3: 80,
-    sts: 77,
-    sas: 79,
-    nilaiSisipan: 78,
-    capaianSisipan: 'Menunjukkan penguasaan baik dan tuntas dalam menyelesaikan operasi bilangan.',
-    nilaiAkhir: 79,
-    capaianAkhir: 'Mampu mencapai kriteria ketuntasan dengan baik pada materi persamaan linear.',
-    sumatif1Saved: true,
-    sumatif2Saved: true,
-    sumatif3Saved: true,
-    stsSaved: true,
-    sasSaved: true
-  }
-];
-
-export const INITIAL_ABSENSI: AbsensiRecord[] = [
-  { id: 'ABS-001', tanggal: '2026-10-28', kelas: '7', rombel: 'A', siswaId: 'SIS-001', namaSiswa: 'Aditya Pratama Putra', status: 'H', keterangan: 'Hadir Tepat Waktu', waliKelas: 'Siti Aminah, M.Pd.' },
-  { id: 'ABS-002', tanggal: '2026-10-28', kelas: '7', rombel: 'A', siswaId: 'SIS-002', namaSiswa: 'Anindya Kirana Putri', status: 'H', keterangan: '', waliKelas: 'Siti Aminah, M.Pd.' },
-  { id: 'ABS-003', tanggal: '2026-10-28', kelas: '7', rombel: 'A', siswaId: 'SIS-003', namaSiswa: 'Bagas Satria Wibowo', status: 'S', keterangan: 'Surat dokter', waliKelas: 'Siti Aminah, M.Pd.' },
-  { id: 'ABS-004', tanggal: '2026-10-28', kelas: '7', rombel: 'A', siswaId: 'SIS-004', namaSiswa: 'Cantika Putri Ramadhani', status: 'H', keterangan: '', waliKelas: 'Siti Aminah, M.Pd.' },
-  { id: 'ABS-005', tanggal: '2026-10-28', kelas: '7', rombel: 'A', siswaId: 'SIS-005', namaSiswa: 'Dimas Arya Yudha', status: 'I', keterangan: 'Acara keluarga', waliKelas: 'Siti Aminah, M.Pd.' },
-  { id: 'ABS-006', tanggal: '2026-10-28', kelas: '7', rombel: 'A', siswaId: 'SIS-006', namaSiswa: 'Eka Lestari Rahayu', status: 'H', keterangan: '', waliKelas: 'Siti Aminah, M.Pd.' }
-];
+const STORAGE_KEY = 'siapgus_school_db_v1';
 
 export function getDatabase(): AppDatabase {
   try {
@@ -263,18 +53,26 @@ export function getDatabase(): AppDatabase {
       const parsed = JSON.parse(raw);
       // Ensure all arrays and profile exist
       return {
-        users: parsed.users || INITIAL_USERS,
+        users: (parsed.users || INITIAL_USERS).map((u: UserAccount, idx: number) => ({
+          ...u,
+          nikNuptk: u.nikNuptk || INITIAL_USERS.find(iu => iu.id === u.id)?.nikNuptk || ''
+        })),
         profile: { ...DEFAULT_PROFILE, ...(parsed.profile || {}) },
         siswa: parsed.siswa || INITIAL_SISWA,
-        guru: parsed.guru || INITIAL_GURU,
+        guru: (parsed.guru || INITIAL_GURU).map((g: Guru, idx: number) => ({
+          ...g,
+          nikNuptk: g.nikNuptk || INITIAL_GURU.find(ig => ig.id === g.id)?.nikNuptk || ''
+        })),
         mapelList: parsed.mapelList || INITIAL_MAPEL_LIST,
         kelasList: parsed.kelasList || INITIAL_KELAS_LIST,
         guruMapel: parsed.guruMapel || INITIAL_GURU_MAPEL,
         waliKelas: parsed.waliKelas || INITIAL_WALI_KELAS,
         jurnal: parsed.jurnal || INITIAL_JURNAL,
         penilaian: parsed.penilaian || INITIAL_PENILAIAN,
-        absensi: parsed.absensi || INITIAL_ABSENSI,
-        sheetsWebAppUrl: parsed.sheetsWebAppUrl || ''
+        absensi: parsed.absensi && parsed.absensi.length > 6 ? parsed.absensi : INITIAL_ABSENSI,
+        sheetsWebAppUrl: parsed.sheetsWebAppUrl || '',
+        autoSyncToSheets: parsed.autoSyncToSheets !== undefined ? parsed.autoSyncToSheets : true,
+        lastSyncedToSheets: parsed.lastSyncedToSheets || ''
       };
     }
   } catch (e) {
@@ -293,7 +91,9 @@ export function getDatabase(): AppDatabase {
     jurnal: INITIAL_JURNAL,
     penilaian: INITIAL_PENILAIAN,
     absensi: INITIAL_ABSENSI,
-    sheetsWebAppUrl: ''
+    sheetsWebAppUrl: '',
+    autoSyncToSheets: true,
+    lastSyncedToSheets: ''
   };
   saveDatabase(initialDb);
   return initialDb;
@@ -304,6 +104,55 @@ export function saveDatabase(db: AppDatabase): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   } catch (e) {
     console.error('Failed to save database to localStorage', e);
+  }
+}
+
+/**
+ * Mengambil database terpusat dari server (agar semua pengguna di manapun mendapatkan data yang sama)
+ */
+export async function fetchServerDatabase(): Promise<AppDatabase | null> {
+  try {
+    const res = await fetch('/api/database', {
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`Server returned HTTP ${res.status}`);
+    }
+    const json = await res.json();
+    if (json.status === 'success' && json.data) {
+      const serverDb = json.data as AppDatabase;
+      // Simpan juga ke localStorage sebagai cache lokal
+      saveDatabase(serverDb);
+      return serverDb;
+    }
+  } catch (err) {
+    console.warn('Gagal memuat database dari server, menggunakan data lokal/fallback:', err);
+  }
+  return null;
+}
+
+/**
+ * Menyimpan database ke server secara permanen (agar tersimpan untuk semua orang dan tidak reset)
+ */
+export async function saveServerDatabase(db: AppDatabase): Promise<boolean> {
+  try {
+    const res = await fetch('/api/database', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(db),
+    });
+    if (!res.ok) {
+      throw new Error(`Server responded with ${res.status}`);
+    }
+    const json = await res.json();
+    return json.status === 'success';
+  } catch (err) {
+    console.error('Gagal menyimpan database ke server:', err);
+    return false;
   }
 }
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AppDatabase,
   Guru,
@@ -18,7 +18,8 @@ import {
   WaliKelasAssignment,
   AbsensiRecord
 } from './types';
-import { getDatabase, saveDatabase } from './storage/db';
+import { getDatabase, saveDatabase, fetchServerDatabase, saveServerDatabase } from './storage/db';
+import { syncPushToSpreadsheet, syncPullFromSpreadsheet } from './utils/spreadsheetSync';
 
 import { AuthScreen } from './components/AuthScreen';
 import { Sidebar } from './components/Sidebar';
@@ -53,11 +54,72 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string>('admin-dashboard');
   const [spreadsheetModalOpen, setSpreadsheetModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const autoSyncTimerRef = useRef<any>(null);
 
-  // Sync state changes to localStorage
-  const updateDb = (newDb: AppDatabase) => {
+  // Load centralized server database on boot and poll every 8 seconds for multi-device sync
+  useEffect(() => {
+    let isMounted = true;
+
+    const syncWithServer = async () => {
+      try {
+        const serverDb = await fetchServerDatabase();
+        if (serverDb && isMounted) {
+          setDb(serverDb);
+        }
+      } catch (err) {
+        console.warn('Initial server sync warning:', err);
+      }
+    };
+
+    syncWithServer();
+
+    // Polling interval so updates from any other computer/phone are reflected automatically
+    const pollInterval = setInterval(async () => {
+      try {
+        const latestDb = await fetchServerDatabase();
+        if (latestDb && isMounted) {
+          setDb(latestDb);
+        }
+      } catch {
+        // Silent background polling
+      }
+    }, 8000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
+  }, []);
+
+  // Sync state changes to localStorage and permanently to server so it never resets across devices
+  const updateDb = (newDb: AppDatabase, skipAutoSync: boolean = false) => {
     setDb(newDb);
-    saveDatabase(newDb);
+    saveDatabase(newDb); // Local fallback cache
+    saveServerDatabase(newDb); // Central server persistence for all users/devices
+
+    if (!skipAutoSync && newDb.sheetsWebAppUrl && newDb.autoSyncToSheets !== false) {
+      if (autoSyncTimerRef.current) {
+        clearTimeout(autoSyncTimerRef.current);
+      }
+      autoSyncTimerRef.current = setTimeout(async () => {
+        try {
+          setIsSyncing(true);
+          await syncPushToSpreadsheet(newDb.sheetsWebAppUrl!, newDb);
+          const syncedTimestamp = new Date().toISOString();
+          setDb((prev) => {
+            const updated = { ...prev, lastSyncedToSheets: syncedTimestamp };
+            saveDatabase(updated);
+            saveServerDatabase(updated);
+            return updated;
+          });
+        } catch (err) {
+          console.error('Background auto-sync error:', err);
+        } finally {
+          setIsSyncing(false);
+        }
+      }, 1500);
+    }
   };
 
   // Login handler
@@ -101,16 +163,27 @@ export default function App() {
     // If registered as guru, also add to Guru table automatically if not already there
     let updatedGuruList = [...db.guru];
     if (newUser.role === 'guru') {
-      const guruExists = updatedGuruList.some(
+      const guruIndex = updatedGuruList.findIndex(
         (g) => g.nama.toLowerCase().trim() === newUser.fullName.toLowerCase().trim()
       );
-      if (!guruExists) {
+      if (guruIndex === -1) {
+        const newGuruId = `GUR-${Date.now()}`;
         updatedGuruList.push({
-          id: `GUR-${Date.now()}`,
+          id: newGuruId,
           nama: newUser.fullName,
           jenisKelamin: 'L',
           mapel: 'Umum',
+          nikNuptk: newUser.nikNuptk || '',
         });
+        userObj.assignedTeacherId = newGuruId;
+      } else {
+        userObj.assignedTeacherId = updatedGuruList[guruIndex].id;
+        if (newUser.nikNuptk && !updatedGuruList[guruIndex].nikNuptk) {
+          updatedGuruList[guruIndex] = {
+            ...updatedGuruList[guruIndex],
+            nikNuptk: newUser.nikNuptk,
+          };
+        }
       }
     }
 
@@ -122,6 +195,24 @@ export default function App() {
     });
 
     return userObj;
+  };
+
+  // Reset user password handler
+  const handleResetPassword = (userId: string, newPassword: string): boolean => {
+    const userIndex = db.users.findIndex((u) => u.id === userId);
+    if (userIndex === -1) return false;
+
+    const updatedUsers = [...db.users];
+    updatedUsers[userIndex] = {
+      ...updatedUsers[userIndex],
+      password: newPassword,
+    };
+
+    updateDb({
+      ...db,
+      users: updatedUsers,
+    });
+    return true;
   };
 
   // ---------------- ADMIN CRUD HANDLERS ----------------
@@ -367,37 +458,59 @@ export default function App() {
     });
   };
 
-  // Google Sheets Cloud Sync Handler
+  // Google Sheets Cloud Sync Handlers (Push & Pull)
   const handleSyncToSheets = async () => {
     if (!db.sheetsWebAppUrl) {
       throw new Error('URL Aplikasi Web Google Apps Script belum disetel.');
     }
+    setIsSyncing(true);
+    try {
+      await syncPushToSpreadsheet(db.sheetsWebAppUrl, db);
+      const syncedTimestamp = new Date().toISOString();
+      const updatedDb = { ...db, lastSyncedToSheets: syncedTimestamp };
+      setDb(updatedDb);
+      saveDatabase(updatedDb);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
-    const payload = {
-      action: 'syncAll',
-      payload: {
-        profil: db.profile,
-        siswa: db.siswa,
-        guru: db.guru,
-        mapel: db.guruMapel,
-        waliKelas: db.waliKelas,
-        jurnal: db.jurnal,
-        penilaian: db.penilaian,
-        absensi: db.absensi,
-        users: db.users,
-      },
+  const handlePullFromSheets = async () => {
+    if (!db.sheetsWebAppUrl) {
+      throw new Error('URL Aplikasi Web Google Apps Script belum disetel.');
+    }
+    setIsSyncing(true);
+    try {
+      const pulledData = await syncPullFromSpreadsheet(db.sheetsWebAppUrl);
+      const updatedDb: AppDatabase = {
+        ...db,
+        ...(pulledData.profile ? { profile: pulledData.profile } : {}),
+        ...(pulledData.siswa ? { siswa: pulledData.siswa } : {}),
+        ...(pulledData.guru ? { guru: pulledData.guru } : {}),
+        ...(pulledData.guruMapel ? { guruMapel: pulledData.guruMapel } : {}),
+        ...(pulledData.waliKelas ? { waliKelas: pulledData.waliKelas } : {}),
+        ...(pulledData.jurnal ? { jurnal: pulledData.jurnal } : {}),
+        ...(pulledData.penilaian ? { penilaian: pulledData.penilaian } : {}),
+        ...(pulledData.absensi ? { absensi: pulledData.absensi } : {}),
+        ...(pulledData.users ? { users: pulledData.users } : {}),
+        lastSyncedToSheets: new Date().toISOString(),
+      };
+      updateDb(updatedDb, true);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleImportDatabase = (importedData: Partial<AppDatabase>) => {
+    const mergedDb: AppDatabase = {
+      ...db,
+      ...(importedData.profile ? { profile: importedData.profile } : {}),
+      ...(importedData.siswa ? { siswa: importedData.siswa } : {}),
+      ...(importedData.guru ? { guru: importedData.guru } : {}),
+      ...(importedData.penilaian ? { penilaian: importedData.penilaian } : {}),
+      ...(importedData.absensi ? { absensi: importedData.absensi } : {}),
     };
-
-    const response = await fetch(db.sheetsWebAppUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      mode: 'no-cors', // Apps script standard cross-origin post
-    });
-
-    return;
+    updateDb(mergedDb);
   };
 
   // If not logged in, show AuthScreen (Login & Register)
@@ -408,6 +521,7 @@ export default function App() {
         users={db.users}
         onLoginSuccess={handleLoginSuccess}
         onRegisterUser={handleRegisterUser}
+        onResetPassword={handleResetPassword}
       />
     );
   }
@@ -439,6 +553,10 @@ export default function App() {
           activeMenu={activeMenu}
           onLogout={handleLogout}
           onOpenSpreadsheetSync={() => setSpreadsheetModalOpen(true)}
+          isSyncing={isSyncing}
+          lastSyncedToSheets={db.lastSyncedToSheets}
+          hasSheetsUrl={Boolean(db.sheetsWebAppUrl)}
+          onQuickSync={handleSyncToSheets}
         />
 
         {/* Viewport Content */}
@@ -570,8 +688,11 @@ export default function App() {
         isOpen={spreadsheetModalOpen}
         onClose={() => setSpreadsheetModalOpen(false)}
         db={db}
-        onUpdateSheetsUrl={(url) => updateDb({ ...db, sheetsWebAppUrl: url })}
+        onUpdateSheetsUrl={(url) => updateDb({ ...db, sheetsWebAppUrl: url }, true)}
+        onToggleAutoSync={(enabled) => updateDb({ ...db, autoSyncToSheets: enabled }, true)}
         onSyncNow={handleSyncToSheets}
+        onPullFromSheets={handlePullFromSheets}
+        onImportDatabase={handleImportDatabase}
       />
     </div>
   );

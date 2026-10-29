@@ -6,6 +6,8 @@ export interface UserAccount {
   password: string;
   role: UserRole;
   fullName: string;
+  email?: string;
+  nikNuptk?: string; // NIK atau NUPTK
   assignedTeacherId?: string; // Links to Guru ID if role === 'guru'
   createdAt: string;
 }
@@ -38,6 +40,7 @@ export interface Guru {
   nama: string;
   jenisKelamin: Gender;
   mapel: string;
+  nikNuptk?: string; // NIK atau NUPTK
 }
 
 export interface MataPelajaran {
@@ -142,4 +145,6 @@ export interface AppDatabase {
   penilaian: PenilaianItem[];
   absensi: AbsensiRecord[];
   sheetsWebAppUrl?: string;
+  autoSyncToSheets?: boolean;
+  lastSyncedToSheets?: string;
 }

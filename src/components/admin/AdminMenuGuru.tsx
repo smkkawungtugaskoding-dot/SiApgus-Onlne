@@ -35,6 +35,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
 }) => {
   // Form State
   const [nama, setNama] = useState('');
+  const [nikNuptk, setNikNuptk] = useState('');
   const [jenisKelamin, setJenisKelamin] = useState<Gender>('L');
   const [mapel, setMapel] = useState(mapelOptions[0] || 'Matematika');
 
@@ -48,6 +49,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
 
   const resetForm = () => {
     setNama('');
+    setNikNuptk('');
     setJenisKelamin('L');
     setMapel(mapelOptions[0] || 'Matematika');
     setEditingId(null);
@@ -57,12 +59,19 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
     e.preventDefault();
     if (!nama.trim()) return;
 
+    if (nikNuptk.trim() && !/^\d+$/.test(nikNuptk.trim())) {
+      setStatusMessage('Perhatian: NIK/NUPTK harus berupa karakter angka numerik.');
+      setTimeout(() => setStatusMessage(''), 4000);
+      return;
+    }
+
     if (editingId) {
       onUpdateGuru({
         id: editingId,
         nama: nama.trim(),
         jenisKelamin,
         mapel,
+        nikNuptk: nikNuptk.trim(),
       });
       setStatusMessage('Data guru berhasil diperbarui!');
     } else {
@@ -70,6 +79,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
         nama: nama.trim(),
         jenisKelamin,
         mapel,
+        nikNuptk: nikNuptk.trim(),
       });
       setStatusMessage('Data guru baru berhasil ditambahkan!');
     }
@@ -81,17 +91,21 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
   const handleStartEdit = (item: Guru) => {
     setEditingId(item.id);
     setNama(item.nama);
+    setNikNuptk(item.nikNuptk || '');
     setJenisKelamin(item.jenisKelamin);
     setMapel(item.mapel);
   };
 
-  // Sort automatically by Alphabet (A-Z)
+  // Sort automatically by Alphabet (A-Z) and search by Name or NIK/NUPTK or Mapel
   const sortedAndFilteredGuru = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return [...guruList]
       .filter((item) => {
-        return item.nama
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase().trim());
+        return (
+          item.nama.toLowerCase().includes(q) ||
+          (item.nikNuptk && item.nikNuptk.toLowerCase().includes(q)) ||
+          item.mapel.toLowerCase().includes(q)
+        );
       })
       .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
   }, [guruList, searchQuery]);
@@ -101,6 +115,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
     const dataToExport = sortedAndFilteredGuru.map((g, index) => ({
       No: index + 1,
       'Nama Guru': g.nama,
+      'NIK/NUPTK': g.nikNuptk || '-',
       'Jenis Kelamin': g.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan',
       'Guru Mata Pelajaran': g.mapel,
     }));
@@ -115,6 +130,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
       const rawData = await parseXLSXFile(file);
       const parsedGuru: Guru[] = rawData.map((row: any, i: number) => {
         const namaParsed = row['Nama Guru'] || row.nama || row.Nama || `Guru Baru ${i + 1}`;
+        const nikParsed = (row['NIK/NUPTK'] || row['NIK'] || row['NUPTK'] || row.nikNuptk || row.nik || row.nuptk || '').toString().trim();
         const jkRaw = (row['Jenis Kelamin'] || row.jenisKelamin || row.JK || 'L').toString().toUpperCase();
         const jk: Gender = jkRaw.startsWith('P') ? 'P' : 'L';
         const mapelParsed = row['Guru Mata Pelajaran'] || row.mapel || row.Mapel || 'Matematika';
@@ -124,6 +140,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
           nama: namaParsed,
           jenisKelamin: jk,
           mapel: mapelParsed,
+          nikNuptk: nikParsed,
         };
       });
 
@@ -207,7 +224,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Nama Guru */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -220,6 +237,30 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
               value={nama}
               onChange={(e) => setNama(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+            />
+          </div>
+
+          {/* NIK / NUPTK */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-700">
+                NIK / NUPTK <span className="text-slate-400 font-normal">(16 Digit)</span>
+              </label>
+              {nikNuptk && !/^\d+$/.test(nikNuptk) && (
+                <span className="text-[10px] text-amber-600 font-medium">Hanya angka</span>
+              )}
+            </div>
+            <input
+              type="text"
+              maxLength={20}
+              placeholder="Contoh: 198504122010011005"
+              value={nikNuptk}
+              onChange={(e) => setNikNuptk(e.target.value.replace(/\s+/g, ''))}
+              className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs text-slate-800 font-mono focus:outline-hidden focus:ring-2 focus:bg-white ${
+                nikNuptk && !/^\d+$/.test(nikNuptk)
+                  ? 'border-amber-400 focus:ring-amber-500'
+                  : 'border-slate-300 focus:ring-emerald-500'
+              }`}
             />
           </div>
 
@@ -260,7 +301,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
           </div>
 
           {/* Form Action Buttons */}
-          <div className="sm:col-span-3 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="sm:col-span-2 lg:col-span-4 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={resetForm}
@@ -286,7 +327,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Cari nama guru..."
+            placeholder="Cari nama guru atau NIK/NUPTK..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
@@ -306,6 +347,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4 w-12 text-center">No</th>
                 <th className="py-3 px-4">Nama Guru (A - Z)</th>
+                <th className="py-3 px-4 w-44">NIK / NUPTK</th>
                 <th className="py-3 px-4 w-36">Jenis Kelamin</th>
                 <th className="py-3 px-4">Guru Mata Pelajaran</th>
                 <th className="py-3 px-4 w-28 text-center">Aksi</th>
@@ -314,7 +356,7 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
             <tbody className="divide-y divide-slate-100">
               {sortedAndFilteredGuru.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     <GraduationCap className="w-8 h-8 mx-auto mb-2 opacity-40" />
                     <p className="text-xs">Tidak ada data guru yang ditemukan.</p>
                   </td>
@@ -330,6 +372,15 @@ export const AdminMenuGuru: React.FC<AdminMenuGuruProps> = ({
                     </td>
                     <td className="py-3 px-4 font-semibold text-slate-800">
                       {item.nama}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-xs text-slate-600">
+                      {item.nikNuptk ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 text-[11px]">
+                          {item.nikNuptk}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic text-[11px]">-</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
